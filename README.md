@@ -8,7 +8,7 @@ The main script, `test_Ground1.py`, takes probability outputs from multiple indi
 
 ## Project Structure
 
--   `test_Ground1.py`: The main executable script that performs data loading, ensembling, evaluation, and visualization.
+-   `main.py`: The main executable script that performs data loading, ensembling, evaluation, and visualization.
 -   `*.csv`: Input data files containing image names and predicted probabilities from individual models.
     -   `isbi2025-ps3c-test-dataset-annotated.csv`: The ground truth file containing the correct labels for each image.
 -   `requirements.txt`: A list of Python dependencies required to run the project.
@@ -35,7 +35,7 @@ pip install -r requirements.txt
 To run the full evaluation and generate the output files, execute the main script from the command line:
 
 ```bash
-python test_Ground1.py
+python main.py
 ```
 
 The script will print the performance metrics for each model and ensemble to the console and save the output charts and CSV files in the project's root directory.
@@ -44,7 +44,7 @@ The script will print the performance metrics for each model and ensemble to the
 
 To add a new model's predictions to the ensemble:
 1.  Place your model's prediction CSV file in the root directory. The CSV must contain an `image_name` column and probability columns for the classes (e.g., 'Healthy', 'Unhealthy', 'Rubbish').
-2.  Open `test_Ground1.py` and add your model's information to the `files` dictionary, following the existing format:
+2.  Open `main.py` and add your model's information to the `files` dictionary, following the existing format:
     ```python
     files = {
         # ... existing models
