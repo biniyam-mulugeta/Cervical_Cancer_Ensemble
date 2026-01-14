@@ -145,7 +145,7 @@ files = {
     "Model_Tes_Set_ProbabilityScore": "Test_Set_ProbabilityScores.csv",
     "Model_isbi2025-ps3c-test-dataset pro Ens": "isbi2025-ps3c-test-dataset pro Ens.csv",
     #"Finetuned_model_Huina": "huina_new.csv",
-    "Finetuned_model_Huina2":"validation_predictions9.csv",
+    "Finetuned_model_Huina2":"validation_predictions2.csv",
     #"minine":"submission.csv",
 }
 
@@ -176,19 +176,19 @@ for name, path in files.items():
         overlap = gt_images.intersection(model_images)
         
         if len(overlap) == 0:
-            print(f"⚠️  WARNING: Model '{name}' has 0 overlapping images with Ground Truth. Excluding.")
+            print(f"warning: Model '{name}' has 0 overlapping images with Ground Truth. Excluding.")
         else:
-            print(f"✅ Model '{name}': {len(overlap)} overlapping images found. Included.")
+            print(f" Model '{name}': {len(overlap)} overlapping images found. Included.")
             dfs.append(cleaned_df)
             valid_models.append(name)
 
 if not dfs:
-    print("\n❌ ERROR: No models match the Ground Truth image names. Exiting.")
+    print("Error: No models match the Ground Truth image names. Exiting.")
     sys.exit()
 
-# ---------------------------------------------------------
-# 3. Merge Data
-# ---------------------------------------------------------
+# 
+# Merge Data
+# 
 
 merged_df = gt_df.copy()
 for df in dfs:
@@ -197,7 +197,7 @@ for df in dfs:
 print(f"\nFinal Merged Dataset Shape: {merged_df.shape}")
 
 if len(merged_df) == 0:
-    print("❌ ERROR: Merged dataset is empty. Check image names.")
+    print("Error: Merged dataset is empty. Check image names.")
     sys.exit()
 
 #Prepare Ensembling
@@ -220,9 +220,9 @@ if np.isnan(y_true).any():
 else:
     y_true = y_true.astype(int)
 
-# ---------------------------------------------------------
-# 5. Ensemble Calculations
-# ---------------------------------------------------------
+# 
+# Ensemble Calculations
+# 
 
 # A. Simple Average
 print("\n--- Computing Simple Average ---")
@@ -295,14 +295,14 @@ y_pred_gmean = np.argmax(gmean_probs, axis=1)
 
 # G. Stacking (Random Forest - Non-Linear)
 print("--- Computing Stacking (Random Forest) ---")
-rf_meta = RandomForestClassifier(n_estimators=100, max_depth=5, random_state=42)
+rf_meta = RandomForestClassifier(n_estimators=50, max_depth=10, random_state=42)
 rf_meta.fit(X_stack, y_true)
 rf_probs = rf_meta.predict_proba(X_stack)
 y_pred_rf = np.argmax(rf_probs, axis=1)
 
 # H. Stacking (Gradient Boosting - Non-Linear)
 print("--- Computing Stacking (Gradient Boosting) ---")
-gb_meta = GradientBoostingClassifier(n_estimators=100, max_depth=3, random_state=42)
+gb_meta = GradientBoostingClassifier(n_estimators=116, max_depth=6, random_state=42)
 gb_meta.fit(X_stack, y_true)
 gb_probs = gb_meta.predict_proba(X_stack)
 y_pred_gb = np.argmax(gb_probs, axis=1)
@@ -354,11 +354,11 @@ all_probs = {
 for m in models:
     all_probs[m] = get_model_probs(merged_df, m)
 
-# ---------------------------------------------------------
-# 7. Visualization (Bar Chart, CM, Radar, ROC, PR)
-# ---------------------------------------------------------
+# 
+# Visualization (Bar Chart, CM, Radar, ROC, PR)
+#
 
-# --- 7.1 Bar Chart ---
+# Bar Chart 
 perf_df = pd.DataFrame(performance_data)
 # Find best model (use F1-score, handle potential ties by taking the first)
 best_model_name = perf_df.loc[perf_df['F1-Score'].idxmax()]['Model']
@@ -366,7 +366,7 @@ print(f"\n🏆 Best performing model is '{best_model_name}' based on F1-Score.")
 
 perf_melted = perf_df.melt(id_vars="Model", var_name="Metric", value_name="Score")
 
-plt.figure(figsize=(16, 9))
+plt.figure(figsize=(16, 9), dpi =300)
 sns.set_style("whitegrid")
 chart = sns.barplot(data=perf_melted, x="Model", y="Score", hue="Metric", palette="viridis")
 plt.title("Extended Ensemble Comparison", fontsize=16)
@@ -376,13 +376,13 @@ plt.legend(loc='lower right')
 for container in chart.containers:
     chart.bar_label(container, fmt='%.4f', padding=3, fontsize=9, rotation=90)
 plt.tight_layout()
-plt.savefig("model_performance_chart.png")
+plt.savefig("./Results/model_performance_chart.png")
 print(f"\nBar Chart saved to model_performance_chart.png")
 
 # --- 7.2 Confusion Matrix for Best Model ---
 best_model_preds = all_preds.get(best_model_name)
 if best_model_preds is not None:
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(8, 6), dpi = 300)
     cm = confusion_matrix(y_true, best_model_preds)
     labels = ['Healthy', 'Unhealthy', 'Rubbish']
     sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=labels, yticklabels=labels)
@@ -390,55 +390,55 @@ if best_model_preds is not None:
     plt.ylabel('True Label')
     plt.title(f'Confusion Matrix: {best_model_name}')
     plt.tight_layout()
-    plt.savefig(f"confusion_matrix_best_model.png")
+    plt.savefig(f"./Results/confusion_matrix_best_model.png")
     print(f"Confusion Matrix for best model saved to confusion_matrix_best_model.png")
 
-# --- 7.3 Radar Chart (Robust Selection) ---
-# Dynamically pick: The Best Individual Model + Simple Average + Best Overall Model
-best_individual_model = max(model_accs, key=model_accs.get)
-selected_models = list(set([best_individual_model, "Simple Average", best_model_name]))
+# # --- 7.3 Radar Chart (Robust Selection) ---
+# # Dynamically pick: The Best Individual Model + Simple Average + Best Overall Model
+# best_individual_model = max(model_accs, key=model_accs.get)
+# selected_models = list(set([best_individual_model, "Simple Average", best_model_name]))
 
-print(f"Selected for Radar Chart: {selected_models}")
+# print(f"Selected for Radar Chart: {selected_models}")
 
-radar_data = []
-for m_name in selected_models:
-    preds = all_preds.get(m_name)
-    if preds is None: continue
+# radar_data = []
+# for m_name in selected_models:
+#     preds = all_preds.get(m_name)
+#     if preds is None: continue
     
-    radar_data.append({
-        "Model": m_name,
-        "Accuracy": accuracy_score(y_true, preds),
-        "F1": f1_score(y_true, preds, average='weighted'),
-        "Precision": precision_score(y_true, preds, average='weighted', zero_division=0),
-        "Recall": recall_score(y_true, preds, average='weighted', zero_division=0)
-    })
+#     radar_data.append({
+#         "Model": m_name,
+#         "Accuracy": accuracy_score(y_true, preds),
+#         "F1": f1_score(y_true, preds, average='weighted'),
+#         "Precision": precision_score(y_true, preds, average='weighted', zero_division=0),
+#         "Recall": recall_score(y_true, preds, average='weighted', zero_division=0)
+#     })
 
-if radar_data:
-    radar_df = pd.DataFrame(radar_data)
-    categories = list(radar_df.columns[1:])
-    N = len(categories)
-    angles = [n / float(N) * 2 * pi for n in range(N)]
-    angles += [angles[0]]
+# if radar_data:
+#     radar_df = pd.DataFrame(radar_data)
+#     categories = list(radar_df.columns[1:])
+#     N = len(categories)
+#     angles = [n / float(N) * 2 * pi for n in range(N)]
+#     angles += [angles[0]]
     
-    plt.figure(figsize=(10, 10))
-    ax = plt.subplot(111, polar=True)
-    plt.xticks(angles[:-1], categories, color='grey', size=10)
-    ax.set_rlabel_position(0)
-    plt.yticks([0.6, 0.7, 0.8, 0.9], ["0.6", "0.7", "0.8", "0.9"], color="grey", size=7)
-    plt.ylim(0.5, 1.0)
+#     plt.figure(figsize=(10, 10))
+#     ax = plt.subplot(111, polar=True)
+#     plt.xticks(angles[:-1], categories, color='grey', size=10)
+#     ax.set_rlabel_position(0)
+#     plt.yticks([0.6, 0.7, 0.8, 0.9], ["0.6", "0.7", "0.8", "0.9"], color="grey", size=7)
+#     plt.ylim(0.5, 1.0)
     
-    colors_list = ['b', 'r', 'g', 'c', 'm', 'y']
-    for i, row in radar_df.iterrows():
-        values = row[categories].values.flatten().tolist()
-        values += [values[0]]
-        color = colors_list[i % len(colors_list)]
-        ax.plot(angles, values, linewidth=2, linestyle='solid', label=row['Model'], color=color)
-        ax.fill(angles, values, color=color, alpha=0.1)
+#     colors_list = ['b', 'r', 'g', 'c', 'm', 'y']
+#     for i, row in radar_df.iterrows():
+#         values = row[categories].values.flatten().tolist()
+#         values += [values[0]]
+#         color = colors_list[i % len(colors_list)]
+#         ax.plot(angles, values, linewidth=2, linestyle='solid', label=row['Model'], color=color)
+#         ax.fill(angles, values, color=color, alpha=0.1)
     
-    plt.title("Radar Chart Comparison", size=15, y=1.1)
-    plt.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1))
-    plt.savefig("radar_chart_comparison.png")
-    print("Radar Chart saved to radar_chart_comparison.png")
+#     plt.title("Radar Chart Comparison", size=15, y=1.1)
+#     plt.legend(loc='upper right', bbox_to_anchor=(0.1, 0.1))
+#     plt.savefig("./Results/radar_chart_comparison.png")
+#     print("Radar Chart saved to radar_chart_comparison.png")
 
 
 # --- 7.4 ROC and PR Curves for Best Model ---
@@ -460,7 +460,7 @@ if best_model_probs is not None:
     fpr["micro"], tpr["micro"], _ = roc_curve(y_true_bin.ravel(), best_model_probs.ravel())
     roc_auc["micro"] = auc(fpr["micro"], tpr["micro"])
 
-    plt.figure(figsize=(10, 8))
+    plt.figure(figsize=(10, 8), dpi=300)
     lw = 2
     plt.plot(fpr["micro"], tpr["micro"],
              label=f'Micro-average ROC (area = {roc_auc["micro"]:0.2f})',
@@ -478,7 +478,7 @@ if best_model_probs is not None:
     plt.ylabel('True Positive Rate')
     plt.title(f'Receiver Operating Characteristic (ROC) for {best_model_name}')
     plt.legend(loc="lower right")
-    plt.savefig(f"roc_curve_best_model.png")
+    plt.savefig(f"./Results/roc_curve_best_model.png")
     print(f"ROC Curve for best model saved to roc_curve_best_model.png")
 
     # --- PR Curve ---
@@ -492,7 +492,7 @@ if best_model_probs is not None:
     precision["micro"], recall["micro"], _ = precision_recall_curve(y_true_bin.ravel(), best_model_probs.ravel())
     average_precision["micro"] = average_precision_score(y_true_bin, best_model_probs, average="micro")
     
-    plt.figure(figsize=(10, 8))
+    plt.figure(figsize=(10, 8), dpi=300)
     plt.plot(recall["micro"], precision["micro"],
              label=f'Micro-average PR (AP = {average_precision["micro"]:0.2f})',
              color='deeppink', linestyle=':', linewidth=4)
@@ -508,7 +508,7 @@ if best_model_probs is not None:
     plt.ylabel('Precision')
     plt.title(f'Precision-Recall (PR) Curve for {best_model_name}')
     plt.legend(loc="lower left")
-    plt.savefig(f"pr_curve_best_model.png")
+    plt.savefig(f"./Results/pr_curve_best_model.png")
     print(f"PR Curve for best model saved to pr_curve_best_model.png")
 
 
